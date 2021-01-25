@@ -10,8 +10,10 @@ parser = ArgumentParser()
 parser.add_argument('--regen',default=False,action='store_true')
 parser.add_argument('--n_event_samples',default=20000,type=int)
 parser.add_argument('--n_cpu',default=1,type=int)
+parser.add_argument('--f_ref',default=None,type=float)
 args = parser.parse_args()
 
+import os
 import numpy as np
 np.random.seed(1234)
 import numpy.lib.recfunctions
@@ -197,7 +199,6 @@ if args.regen or not os.path.exists('final_params.npy'):
     G = 6.67e-11 # Units: m^3 / (kg s^2)
     c = 3e8 # Units: m/s
     Msol = 1.989e30 # Units: kg
-    fref = 20 # Units: 1/s
 
     def calc_final_state(samples):
         q = 1./samples['mass_ratio'] # use q>=1 definition
@@ -205,8 +206,11 @@ if args.regen or not os.path.exists('final_params.npy'):
             chi_1 = mag_tilt_to_components(samples['a_1'],samples['cos_tilt_1'])
             chi_2 = mag_tilt_to_components(samples['a_2'],samples['cos_tilt_2'])
             mtot = Msol*samples['mass_1']*(1.+1./q) # Units: kg
-            omega0 = (fref/2.)*G*mtot/(c**3)
-            mf, chif, vf, _, _, _ = fit7dq4.all(q, chi_1, chi_2,omega0=omega0,allow_extrap=True)
+            if args.f_ref:
+                omega0 = (args.f_ref/2.)*G*mtot/(c**3)
+                mf, chif, vf, _, _, _ = fit7dq4.all(q, chi_1, chi_2,omega0=omega0,allow_extrap=True,PN_dt=5)
+            else:
+                mf, chif, vf, _, _, _ = fit7dq4.all(q, chi_1, chi_2,allow_extrap=True)
             return mf*samples['mass_1']*(1.+1./q),np.linalg.norm(chif),np.linalg.norm(vf)
         else:
             chi_1 = [0,0,samples['a_1']*samples['cos_tilt_1']]
@@ -223,10 +227,15 @@ if args.regen or not os.path.exists('final_params.npy'):
         pool = Pool(args.n_cpu)
         final_params = np.array(pool.map(calc_final_state,fid_pop_samples))
     else:
-        final_params = np.array(list(map(calc_final_state,fid_pop_samples)))
-    np.save('final_params.npy',[final_params,fid_pop_samples])
+        final_params = []
+        for i in range(len(fid_pop_samples)):
+            print(f'finished processing {i}/{args.n_event_samples}')
+            final_params.append(calc_final_state(fid_pop_samples[i]))
+        final_params = np.array(final_params)
+    np.save('final_params.npy',final_params)
+    np.save('fid_pop_samples.npy',fid_pop_samples)
 else:
-    final_params,fid_pop_samples = np.load('final_params.npy')
+    final_params,fid_pop_samples = np.load('final_params.npy'),np.load('fid_pop_samples.npy')
 
 
 
