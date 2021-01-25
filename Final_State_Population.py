@@ -9,6 +9,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument('--regen',default=False,action='store_true')
 parser.add_argument('--n_event_samples',default=20000,type=int)
+parser.add_argument('--n_cpu',default=1,type=int)
 args = parser.parse_args()
 
 import numpy as np
