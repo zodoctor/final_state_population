@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# ./Final_State_Population.py --n_event_samples 20000 --f_ref 20 --regen --n_cpu 4
+
 # # Characterize the population of remnant black holes
 
 # In[1]:
@@ -180,13 +182,13 @@ def get_weights(hypersample,event_samples):
 
 
 # Get mass and spin samples from the maxL population
+max_L_idx = np.argmax(posterior_samples['log_likelihood'])
 
 # In[7]:
 
 if args.regen or not os.path.exists('final_params.npy'):
 
     n_event_samples = args.n_event_samples
-    max_L_idx = np.argmax(posterior_samples['log_likelihood'])
     fid_pop_samples = get_event_samples({key:value[max_L_idx] for key,value in posterior_samples.items()},
                                         n_samples=n_event_samples)
 
@@ -207,7 +209,7 @@ if args.regen or not os.path.exists('final_params.npy'):
             chi_2 = mag_tilt_to_components(samples['a_2'],samples['cos_tilt_2'])
             mtot = Msol*samples['mass_1']*(1.+1./q) # Units: kg
             if args.f_ref:
-                omega0 = (args.f_ref/2.)*G*mtot/(c**3)
+                omega0 = 2.*np.pi*(args.f_ref/2.)*G*mtot/(c**3)
                 mf, chif, vf, _, _, _ = fit7dq4.all(q, chi_1, chi_2,omega0=omega0,allow_extrap=True,PN_dt=5)
             else:
                 mf, chif, vf, _, _, _ = fit7dq4.all(q, chi_1, chi_2,allow_extrap=True)
@@ -236,8 +238,9 @@ if args.regen or not os.path.exists('final_params.npy'):
     np.save('fid_pop_samples.npy',fid_pop_samples)
 else:
     final_params,fid_pop_samples = np.load('final_params.npy'),np.load('fid_pop_samples.npy')
+    n_event_samples = len(fid_pop_samples)
 
-
+print('got remnant params for fiducial samples')
 
 def weighted_percentile(a,w,q):
     """
@@ -265,6 +268,8 @@ xlabels = ['M_f','\chi_f','v_f']
 base_rate = rate_calc.number_density(present_rate=1.)
 
 fid_weights = get_weights({key:value[max_L_idx] for key,value in posterior_samples.items()},fid_pop_samples)
+
+fig,ax = plt.subplots(1,3,figsize=(14,5))
 
 n_hyper_lines = 500 
 n_params = len(xlabels)
@@ -312,7 +317,6 @@ xlims = [(0,200),(0,1),(0,4)]
 ylims = [(1e-2,1e2),(1e1,1e5),(1e0,1e4)]
 xlabels = ['M_f','\chi_f','v_f']
 
-fig,ax = plt.subplots(1,3,figsize=(14,5))
 for j in range(len(ax)):
     ax[j].tick_params(labelsize=13)
     paramlines = lines[:,:,j]
@@ -379,9 +383,10 @@ for j in range(n_params):
         if k <= j:
             continue    
         #fig,ax = plt.subplots()
+        my_cmap = plt.cm.viridis
         ax[ax_num].set_facecolor(my_cmap(0))
         im = ax[ax_num].hist2d(transforms[j](new_fin_params_arr[:,j]),transforms[k](new_fin_params_arr[:,k]),
-                   weights=new_wts_arr,density=True,bins=25,norm=matplotlib.colors.LogNorm(),cmap=plt.cm.viridis)
+                   weights=new_wts_arr,density=True,bins=25,norm=matplotlib.colors.LogNorm(),cmap=my_cmap)
         ax[ax_num].set_xlabel(r'$'+labels[j]+r'$',fontsize=16)
         ax[ax_num].set_ylabel(r'$'+labels[k]+r'$',fontsize=16)
         ax[ax_num].set_title(r'$p\left('+labels[j]+','+labels[k]+r'\right)$',fontsize=16)
